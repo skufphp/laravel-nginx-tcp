@@ -1,4 +1,4 @@
-FROM php:8.5-fpm-alpine
+FROM php:8.4-fpm-alpine
 
 # Установка необходимых пакетов и PHP-расширений для PostgreSQL и Laravel
 RUN apk add --no-cache \
