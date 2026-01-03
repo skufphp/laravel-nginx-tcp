@@ -1,6 +1,6 @@
-# ==========================================
-# Laravel PHP-FPM Nginx Socket (Boilerplate)
-# ==========================================
+# ========================================
+# Laravel PHP-FPM Nginx TCP (Boilerplate)
+# ========================================
 
 .PHONY: help up down restart build rebuild logs status shell-php shell-nginx shell-postgres clean setup artisan migrate laravel-install
 
@@ -11,10 +11,16 @@ RED=\033[0;31m
 NC=\033[0m
 
 # Сервисы
-PHP_CONTAINER=laravel-php-nginx-socket
+PHP_CONTAINER=laravel-php-nginx-tcp
+NGINX_CONTAINER=laravel-nginx-tcp
+POSTGRES_CONTAINER=laravel-postgres-nginx-tcp
+PGADMIN_CONTAINER=laravel-pgadmin-nginx-tcp
+
+# Файл переменных окружения
+ENV_FILE=.env.docker
 
 help: ## Показать справку
-	@echo "$(YELLOW)Laravel Docker Boilerplate (Unix Socket)$(NC)"
+	@echo "$(YELLOW)Laravel Docker Boilerplate (TCP)$(NC)"
 	@echo "======================================"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "$(GREEN)%-20s$(NC) %s\n", $$1, $$2}'
 
@@ -22,16 +28,20 @@ check-files: ## Проверить наличие всех необходимы�
 	@echo "$(YELLOW)Проверка файлов конфигурации...$(NC)"
 	@test -f docker-compose.yml || (echo "$(RED)✗ docker-compose.yml не найден$(NC)" && exit 1)
 	@test -f docker-compose.xdebug.yml || (echo "$(RED)✗ docker-compose.xdebug.yml не найден$(NC)" && exit 1)
-	@test -f env/.env || (echo "$(RED)✗ env/.env не найден$(NC)" && exit 1)
+	@test -f $(ENV_FILE) || (echo "$(RED)✗ $(ENV_FILE) не найден$(NC)" && exit 1)
 	@test -f docker/php.Dockerfile || (echo "$(RED)✗ docker/php.Dockerfile не найден$(NC)" && exit 1)
 	@test -f config/nginx/conf.d/default.conf || (echo "$(RED)✗ config/nginx/conf.d/default.conf не найден$(NC)" && exit 1)
 	@test -f config/php/php.ini || (echo "$(RED)✗ config/php/php.ini не найден$(NC)" && exit 1)
-	@test -d public/ || (echo "$(RED)✗ директория public/ не найдена$(NC)" && exit 1)
 	@echo "$(GREEN)✓ Все файлы на месте$(NC)"
+
+setup: ## Настройка окружения (копирование .env если нет)
+	@if [ ! -f .env.docker ]; then \
+		cp .env.docker.example .env.docker; \
+		echo "$(GREEN)✓ Создан .env.docker из примера$(NC)"; \
+	fi
 
 up: check-files ## Запустить контейнеры
 	@mkdir -p src
-	$(MAKE) setup
 	docker compose up -d
 	@echo "$(GREEN)✓ Проект запущен на http://localhost$(NC)"
 
@@ -60,21 +70,20 @@ xdebug-down: ## Остановить стек, запущенный с Xdebug
 	docker compose -f docker-compose.yml -f docker-compose.xdebug.yml down
 	@echo "$(GREEN)✓ Сервисы с Xdebug остановлены$(NC)"
 
-
 logs: ## Показать логи
 	docker compose logs -f
 
 logs-php: ## Просмотр логов PHP-FPM
-	docker compose logs -f laravel-php-nginx-tcp
+	docker compose logs -f $(PHP_CONTAINER)
 
 logs-nginx: ## Просмотр логов Nginx
-	docker compose logs -f laravel-nginx-tcp
+	docker compose logs -f $(NGINX_CONTAINER)
 
 logs-postgres: ## Просмотр логов PostgreSQL
-	docker compose logs -f laravel-postgres-nginx-tcp
+	docker compose logs -f $(POSTGRES_CONTAINER)
 
 logs-pgadmin: ## Просмотр логов pgAdmin
-	docker compose logs -f laravel-pgadmin-nginx-tcp
+	docker compose logs -f $(PGADMIN_CONTAINER)
 
 status: ## Статус контейнеров
 	docker compose ps
@@ -86,7 +95,7 @@ shell-nginx: ## Подключиться к контейнеру Nginx
 	docker compose exec $(NGINX_CONTAINER) sh
 
 shell-postgres: ## Подключиться к PostgreSQL CLI
-	docker compose exec $(POSTGRES_DB_CONTAINER) psql -U $$POSTGRES_USER -d $$POSTGRES_DB
+	docker compose exec $(POSTGRES_CONTAINER) psql -U $$(grep POSTGRES_USER $(ENV_FILE) | cut -d '=' -f 2) -d $$(grep POSTGRES_DB $(ENV_FILE) | cut -d '=' -f 2)
 
 # --- Laravel команды ---
 
@@ -119,16 +128,16 @@ fresh: ## Пересоздать базу и запустить сиды
 tinker: ## Запустить Laravel Tinker
 	docker compose exec $(PHP_CONTAINER) php artisan tinker
 
-test: ## Запустить тесты
+test-php: ## Запустить тесты PHP (PHPUnit)
 	docker compose exec $(PHP_CONTAINER) php artisan test
 
 permissions: ## Исправить права доступа для Laravel (storage/cache)
 	@echo "$(YELLOW)Исправление прав доступа...$(NC)"
-	docker compose exec $(PHP_CONTAINER) sh -c "chown -R www-data:www-data storage bootstrap/cache && chmod -R ug+rwX storage bootstrap/cache"
+	docker compose exec $(PHP_CONTAINER) sh -c "if [ -d storage ]; then chown -R www-data:www-data storage bootstrap/cache && chmod -R ug+rwX storage bootstrap/cache; fi"
 	@echo "$(GREEN)✓ Права доступа исправлены$(NC)"
 
 info: ## Показать информацию о проекте
-	@echo "$(YELLOW)PHP-Nginx-TCP Development Environment$(NC)"
+	@echo "$(YELLOW)Laravel-Nginx-TCP Development Environment$(NC)"
 	@echo "======================================"
 	@echo "$(GREEN)Сервисы:$(NC)"
 	@echo "  • PHP-FPM 8.4 (Alpine)"
@@ -137,18 +146,18 @@ info: ## Показать информацию о проекте
 	@echo "  • pgAdmin 4"
 	@echo ""
 	@echo "$(GREEN)Структура:$(NC)"
-	@echo "  • public/           - публичные файлы (DocumentRoot)"
+	@echo "  • src/              - исходный код Laravel"
 	@echo "  • config/nginx/     - конфигурация Nginx"
 	@echo "  • config/php/       - конфигурация PHP (php.ini)"
-	@echo "  • env/.env          - переменные окружения"
+	@echo "  • .env.docker       - переменные окружения"
 	@echo ""
 	@echo "$(GREEN)Порты:$(NC)"
-	@echo "  • 80   - Nginx"
-	@echo "  • 5432 - PostgreSQL"
-	@echo "  • 8080 - pgAdmin"
-	@echo "  • 9000 - PHP-FPM (внутренний)"
+	@echo "  • 80   - Nginx (Web Server)"
+	@echo "  • 5432 - PostgreSQL (Database)"
+	@echo "  • 8080 - pgAdmin (DB Admin Interface)"
+	@echo "  • 9000 - PHP-FPM (Internal TCP)"
 
-test: ## Проверить работу сервисов
+validate: ## Проверить доступность сервисов по HTTP
 	@echo "$(YELLOW)Проверка работы сервисов...$(NC)"
 	@echo -n "Nginx (http://localhost): "
 	@curl -s -o /dev/null -w "%{http_code}" http://localhost && echo " $(GREEN)✓$(NC)" || echo " $(RED)✗$(NC)"
@@ -164,8 +173,7 @@ clean: ## Удалить контейнеры и тома
 
 clean-all: ## Полная очистка (контейнеры, образы, тома)
 	@echo "$(YELLOW)Полная очистка...$(NC)"
-	docker compose down -v
-	docker compose down --rmi all
+	docker compose down -v --rmi all
 	@echo "$(GREEN)✓ Выполнена полная очистка$(NC)"
 
 dev-reset: clean-all build up ## Сброс среды разработки
@@ -173,12 +181,12 @@ dev-reset: clean-all build up ## Сброс среды разработки
 
 # Composer команды
 composer-install: ## Установить зависимости через Composer
-	docker compose exec php-nginx-tcp composer install
+	docker compose exec $(PHP_CONTAINER) composer install
 
 composer-update: ## Обновить зависимости через Composer
-	docker compose exec php-nginx-tcp composer update
+	docker compose exec $(PHP_CONTAINER) composer update
 
 composer-require: ## Установить пакет через Composer (make composer-require PACKAGE=vendor/package)
-	docker compose exec php-nginx-tcp composer require $(PACKAGE)
+	docker compose exec $(PHP_CONTAINER) composer require $(PACKAGE)
 
 .DEFAULT_GOAL := help
