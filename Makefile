@@ -42,6 +42,7 @@ setup: ## Настройка окружения (копирование .env е�
 
 up: check-files ## Запустить контейнеры
 	@mkdir -p src
+	$(MAKE) setup
 	docker compose up -d
 	@echo "$(GREEN)✓ Проект запущен на http://localhost$(NC)"
 
@@ -97,7 +98,7 @@ shell-nginx: ## Подключиться к контейнеру Nginx
 shell-postgres: ## Подключиться к PostgreSQL CLI
 	docker compose exec $(POSTGRES_CONTAINER) psql -U $$(grep POSTGRES_USER $(ENV_FILE) | cut -d '=' -f 2) -d $$(grep POSTGRES_DB $(ENV_FILE) | cut -d '=' -f 2)
 
-# --- Laravel команды ---
+# --- Команды Laravel ---
 
 laravel-install: up ## Создать новый проект Laravel в ./src
 	@if [ -f src/artisan ]; then \
@@ -155,7 +156,7 @@ info: ## Показать информацию о проекте
 	@echo "  • 80   - Nginx (Web Server)"
 	@echo "  • 5432 - PostgreSQL (Database)"
 	@echo "  • 8080 - pgAdmin (DB Admin Interface)"
-	@echo "  • 9000 - PHP-FPM (Internal TCP)"
+	@echo "  • 9000 - PHP-FPM (TCP)"
 
 validate: ## Проверить доступность сервисов по HTTP
 	@echo "$(YELLOW)Проверка работы сервисов...$(NC)"
@@ -179,7 +180,7 @@ clean-all: ## Полная очистка (контейнеры, образы, �
 dev-reset: clean-all build up ## Сброс среды разработки
 	@echo "$(GREEN)✓ Среда разработки сброшена и перезапущена!$(NC)"
 
-# Composer команды
+# --- Команды Composer ---
 composer-install: ## Установить зависимости через Composer
 	docker compose exec $(PHP_CONTAINER) composer install
 

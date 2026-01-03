@@ -1,3 +1,6 @@
+# ==============================================================================
+# PHP-FPM Custom Image (TCP)
+# ==============================================================================
 FROM php:8.4-fpm-alpine
 
 # Установка необходимых пакетов и PHP-расширений для PostgreSQL и Laravel
@@ -39,7 +42,7 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Устанавливаем рабочую директорию
 WORKDIR /var/www/laravel
 
-# Открываем порт FPM по TCP (только внутри сети Docker)
+# Открываем порт PHP-FPM
 EXPOSE 9000
 
 CMD ["php-fpm", "-F"]
