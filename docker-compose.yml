@@ -23,7 +23,7 @@ services:
 
   # Веб-сервер Nginx
   laravel-nginx-tcp:
-    image: nginx:alpine
+    image: nginx:stable-alpine
     container_name: laravel-nginx-tcp
     restart: unless-stopped
     ports:
