@@ -1,58 +1,272 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Laravel Nginx TCP Lab
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Тестовый проект для проверки сборки и запуска Laravel на базе boilerplate `skufphp/laravel-starter-nginx-tcp`.
 
-## About Laravel
+Репозиторий используется как лабораторный стенд для Laravel-приложения, собранного на связке:
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- PHP-FPM + Nginx через TCP
+- PostgreSQL
+- Redis
+- Node.js / Vite
+- Docker Compose для локальной разработки, локального production-like запуска и server-side production compose
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+Отдельно проект подготовлен так, чтобы его было удобно использовать для деплоя через Dokploy: production-конфигурация уже вынесена в отдельные compose-файлы и ориентирована на контейнерный запуск.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Что здесь проверяется
 
-## Learning Laravel
+- Сборка Laravel-приложения из boilerplate-конфигурации
+- Работа Nginx и PHP-FPM через TCP-подключение внутри Docker-сети
+- Dev-режим с примонтированным кодом, Vite и Xdebug
+- Production-сборка с multi-stage Dockerfile
+- Запуск очередей и scheduler в отдельных контейнерах
+- Отдельные production compose-файлы для локальной проверки и серверного деплоя
+- Готовность проекта к деплою через Docker Compose / Dokploy
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Основа проекта
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+Этот репозиторий основан на boilerplate-проекте:
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+- upstream: `skufphp/laravel-starter-nginx-tcp`
 
-## Agentic Development
+Из него взята общая архитектура окружения:
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+- Nginx проксирует запросы в PHP-FPM через FastCGI по TCP на порт `9000`
+- PHP-FPM слушает TCP-порт `9000` внутри Docker-сети
+- PostgreSQL используется как основная БД
+- Redis используется для кеша, сессий и очередей
+- Node-контейнер отвечает за frontend-сборку и Vite HMR
+- Production-сборка выполняется через multi-stage Dockerfile
+
+## Структура
+
+- `docker/` — Dockerfile и конфигурация PHP / Nginx
+- `docker-compose.yml` — окружение для разработки
+- `docker-compose.prod.local.yml` — локальный запуск production-профиля с публикацией `NGINX_PORT`
+- `docker-compose.prod.yml` — production-конфигурация для серверного деплоя без проброса локальных портов
+- `Makefile` — основные команды для разработки и обслуживания
+- `.env.example` — шаблон переменных для dev
+- `.env.production.example` — шаблон переменных для production
+
+## Быстрый старт для разработки
+
+1. Скопируйте переменные окружения:
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+cp .env.example .env
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+2. Заполните `.env` реальными значениями.
 
-## Contributing
+Минимально проверьте:
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+- `APP_*`
+- `DB_*`
+- `REDIS_*`
+- `NGINX_PORT`
+- `DB_FORWARD_PORT`
+- `REDIS_FORWARD_PORT`
+- `PGADMIN_*`
+- `XDEBUG_*` при необходимости
 
-## Code of Conduct
+3. Запустите инициализацию проекта:
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```bash
+make setup
+```
 
-## Security Vulnerabilities
+Команда:
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+- соберет dev-образы
+- поднимет контейнеры
+- дождется готовности PostgreSQL и Redis
+- установит Composer и NPM зависимости
+- сгенерирует `APP_KEY`
+- выполнит миграции
+- выставит права на `storage/` и `bootstrap/cache`
+- удалит `public/.htaccess` (не используется с Nginx)
 
-## License
+После запуска будут доступны:
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+- Laravel: `http://localhost:8050` по умолчанию, порт берется из `NGINX_PORT`
+- Vite dev server: `http://localhost:5173`
+- pgAdmin: `http://localhost:8080` по умолчанию, порт берется из `PGADMIN_PORT`
+
+Если нужна ручная последовательность, используйте:
+
+```bash
+make build
+make up
+make install-deps
+make artisan CMD="key:generate"
+make migrate
+make cleanup-nginx
+```
+
+## Основные команды
+
+### Development
+
+```bash
+make up
+make down
+make restart
+make build
+make rebuild
+make logs
+make logs-php
+make logs-nginx
+make logs-postgres
+make logs-redis
+make logs-node
+make logs-queue
+make logs-scheduler
+make logs-pgadmin
+make status
+make validate
+make info
+```
+
+### Laravel / PHP / Node
+
+```bash
+make artisan CMD="migrate"
+make composer CMD="install"
+make migrate
+make rollback
+make fresh
+make tinker
+make composer-install
+make composer-update
+make composer-require PACKAGE=vendor/package
+make npm-install
+make npm-dev
+make npm-build
+make test-php
+make test-coverage
+```
+
+### Утилиты и очистка
+
+```bash
+make permissions
+make cleanup-nginx
+make clean
+make clean-all
+make dev-reset
+```
+
+### Shell и CLI-доступ
+
+```bash
+make shell-php
+make shell-nginx
+make shell-node
+make shell-postgres
+make shell-redis
+make shell-queue
+make shell-scheduler
+```
+
+`shell-postgres` запускает `psql`, а `shell-redis` выполняет проверку через `redis-cli`.
+
+### Production / Production-like
+
+```bash
+make up-prod
+make down-prod
+make rebuild-prod
+make logs-prod
+make logs-php-prod
+make logs-nginx-prod
+make logs-postgres-prod
+make logs-redis-prod
+make logs-queue-prod
+make logs-scheduler-prod
+make shell-php-prod
+make shell-nginx-prod
+make shell-postgres-prod
+make shell-redis-prod
+make shell-queue-prod
+make shell-scheduler-prod
+make clean-prod
+make clean-all-prod
+make prod-reset
+```
+
+## Сетевое взаимодействие PHP-FPM и Nginx
+
+В этом проекте связка PHP-FPM и Nginx построена через TCP, а не через Unix Socket:
+
+- PHP-FPM слушает `0.0.0.0:9000` внутри контейнера
+- Nginx отправляет FastCGI-запросы на `laravel-php-nginx-tcp:9000`
+- healthcheck PHP-FPM проверяет доступность FPM через `cgi-fcgi -connect 127.0.0.1:9000`
+- внутри dev и production профилей используется одинаковая схема подключения
+
+Это удобно для контейнерных окружений, где сервисы взаимодействуют друг с другом по именам сервисов Docker Compose в одной сети.
+
+## Production-like локальный запуск
+
+Для локальной проверки production-сценария:
+
+1. Скопируйте шаблон:
+
+```bash
+cp .env.production.example .env.production
+```
+
+2. Заполните `.env.production`.
+
+3. Запустите production-профиль:
+
+```bash
+make up-prod
+```
+
+Этот target использует:
+
+- `.env.production`
+- `docker-compose.prod.local.yml`
+- production stage из `docker/php.Dockerfile` и `docker/nginx.Dockerfile`
+
+Для остановки:
+
+```bash
+make down-prod
+```
+
+Для просмотра логов:
+
+```bash
+make logs-prod
+```
+
+В production-профиле:
+
+- используется production stage из `docker/php.Dockerfile`
+- используется production stage из `docker/nginx.Dockerfile`
+- Laravel собирается без dev-зависимостей
+- frontend-ассеты собираются на этапе image build
+- миграции выполняются автоматически при старте PHP-контейнера
+- перед стартом PHP выполняется `php artisan optimize:clear`
+- queue worker и scheduler вынесены в отдельные сервисы
+- локально публикуется только Nginx-порт, заданный через `NGINX_PORT`
+
+## Server-side production compose
+
+Файл `docker-compose.prod.yml` предназначен для серверного запуска:
+
+- использует `.env.production`
+- не публикует локальные dev-порты
+- оставляет только production-сервисы: PHP-FPM, Nginx, PostgreSQL, Redis, Queue Worker, Scheduler
+- подходит как база для деплоя через Dokploy или обычный Docker Compose на сервере
+
+## Сервисы проекта
+
+- `laravel-php-nginx-tcp` — PHP-FPM контейнер приложения
+- `laravel-nginx-tcp` — Nginx frontend
+- `laravel-node-nginx-tcp` — Node/Vite контейнер для dev-режима
+- `laravel-postgres-nginx-tcp` — PostgreSQL
+- `laravel-redis-nginx-tcp` — Redis
+- `laravel-queue-nginx-tcp` — Laravel queue worker
+- `laravel-scheduler-nginx-tcp` — Laravel scheduler
+- `laravel-pgadmin-nginx-tcp` — pgAdmin, только для development
