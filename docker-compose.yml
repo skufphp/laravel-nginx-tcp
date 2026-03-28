@@ -21,9 +21,8 @@ services:
       XDEBUG_CLIENT_HOST: ${XDEBUG_CLIENT_HOST}
     networks:
       - laravel-nginx-tcp-network
-    depends_on:
-      - laravel-node-nginx-tcp
     healthcheck:
+      # Проверка доступности FPM через сокет
       test:
         [
           "CMD-SHELL",
@@ -118,6 +117,8 @@ services:
     command: [ "redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-}" ]
     volumes:
       - redis-data:/data
+    ports:
+      - "${REDIS_FORWARD_PORT:-6379}:6379"
     networks:
       - laravel-nginx-tcp-network
     healthcheck:

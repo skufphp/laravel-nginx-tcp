@@ -1,6 +1,6 @@
 # Laravel Nginx TCP Lab
 
-Тестовый проект для проверки сборки и запуска Laravel на базе boilerplate `skufphp/laravel-starter-nginx-tcp`.
+Тестовый проект для проверки сборки и запуска Laravel на базе boilerplate [`skufphp/laravel-starter-nginx-tcp`](https://github.com/skufphp/laravel-starter-nginx-tcp).
 
 Репозиторий используется как лабораторный стенд для Laravel-приложения, собранного на связке:
 
@@ -15,7 +15,7 @@
 ## Что здесь проверяется
 
 - Сборка Laravel-приложения из boilerplate-конфигурации
-- Работа Nginx и PHP-FPM через TCP-подключение внутри Docker-сети
+- Работа Nginx и PHP-FPM через TCP вместо Unix Socket
 - Dev-режим с примонтированным кодом, Vite и Xdebug
 - Production-сборка с multi-stage Dockerfile
 - Запуск очередей и scheduler в отдельных контейнерах
@@ -26,7 +26,7 @@
 
 Этот репозиторий основан на boilerplate-проекте:
 
-- upstream: `skufphp/laravel-starter-nginx-tcp`
+- upstream: [`skufphp/laravel-starter-nginx-tcp`](https://github.com/skufphp/laravel-starter-nginx-tcp)
 
 Из него взята общая архитектура окружения:
 
@@ -251,22 +251,22 @@ make logs-prod
 - queue worker и scheduler вынесены в отдельные сервисы
 - локально публикуется только Nginx-порт, заданный через `NGINX_PORT`
 
-## Server-side production compose
+## Dokploy
 
-Файл `docker-compose.prod.yml` предназначен для серверного запуска:
+Проект подходит для деплоя через Dokploy как Docker Compose приложение.
 
-- использует `.env.production`
-- не публикует локальные dev-порты
-- оставляет только production-сервисы: PHP-FPM, Nginx, PostgreSQL, Redis, Queue Worker, Scheduler
-- подходит как база для деплоя через Dokploy или обычный Docker Compose на сервере
+Практически это означает:
 
-## Сервисы проекта
+- в качестве основной production-конфигурации для сервера следует использовать `docker-compose.prod.yml`
+- `docker-compose.prod.local.yml` нужен именно для локальной проверки production-профиля
+- переменные окружения следует задавать через `.env.production` или интерфейс Dokploy
+- Nginx, PHP, PostgreSQL, Redis, queue worker и scheduler уже разделены по сервисам
+- production-образы собираются из этого репозитория без необходимости отдельного Dockerfile для Dokploy
 
-- `laravel-php-nginx-tcp` — PHP-FPM контейнер приложения
-- `laravel-nginx-tcp` — Nginx frontend
-- `laravel-node-nginx-tcp` — Node/Vite контейнер для dev-режима
-- `laravel-postgres-nginx-tcp` — PostgreSQL
-- `laravel-redis-nginx-tcp` — Redis
-- `laravel-queue-nginx-tcp` — Laravel queue worker
-- `laravel-scheduler-nginx-tcp` — Laravel scheduler
-- `laravel-pgadmin-nginx-tcp` — pgAdmin, только для development
+Перед деплоем через Dokploy проверьте:
+
+- заполнены `APP_KEY`, `APP_URL` и production-переменные Laravel
+- корректно настроены `DB_*` и `REDIS_*`
+- выделены persistent volumes для PostgreSQL и Redis
+- внешний роутинг Dokploy направлен на сервис `laravel-nginx-tcp`
+- если миграции не должны выполняться автоматически при каждом старте контейнера, скорректируйте `command` у `laravel-php-nginx-tcp` в production compose
