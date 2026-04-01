@@ -30,12 +30,6 @@ RUN npm run build
 # ==============================================================================
 FROM nginx:1.29-alpine AS nginx-base
 
-# Nginx работает от группы www-data для согласованности прав с PHP-FPM.
-# На Alpine группа может уже существовать, поэтому добавление делаем безопасно.
-RUN set -eux; \
-    addgroup -g 82 -S www-data 2>/dev/null || true; \
-    addgroup nginx www-data
-
 WORKDIR /var/www/laravel
 
 # Удаляем дефолтный конфиг и подставляем конфиг Laravel
